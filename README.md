@@ -1,358 +1,237 @@
-# Agent Development Kit (ADK) + Vertex AI RAG Engine
+# Vertex AI RAG + ADK Conversational Assistant
 
-A production-ready Retrieval-Augmented Generation (RAG) engine built with Google's [Agent Development Kit (ADK)](https://google.github.io/adk-docs/) and [Vertex AI RAG Engine](https://cloud.google.com/vertex-ai/generative-ai/docs/rag-engine/rag-overview). This project provides a modular framework for managing Google Cloud Storage (GCS) buckets, RAG corpora, and document retrieval with a focus on best practices and user experience.
+A production-ready conversational Retrieval-Augmented Generation (RAG) solution built with Google’s Agent Development Kit (ADK) and Vertex AI RAG / Search capabilities. This project has been customized for a client workflow that uses Google Drive as the knowledge base, ADC-only authentication, and a Google-hosted tester URL for end-user validation.
 
-![RAG Query Interface](.Images/RAG-Single-Query-Search-Web.gif)
+## Overview
 
-![GCS File Upload Interface](.Images/GCS-File-Upload-Web.gif)
+This solution provides:
+- A conversational user interface.
+- RAG-based retrieval from Google Drive-backed knowledge sources.
+- Vertex AI-powered reasoning and generation.
+- ADC-only authentication.
+- A modular workflow aligned with the technical architecture shown in the reference diagram [file:181].
 
-## Vertex AI RAG Engine
-
-Vertex AI RAG Engine is a component of the Vertex AI Platform that facilitates Retrieval-Augmented Generation (RAG) and serves as a data framework for developing context-augmented large language model (LLM) applications. It enables you to enrich LLM context with your organization's private knowledge, reducing hallucinations and improving answer accuracy.
-
-### RAG Process Concepts
-
-These concepts are listed in the order of the retrieval-augmented generation (RAG) process:
-
-1. **Data ingestion**: Intake data from different data sources. For example, local files, Cloud Storage, and Google Drive.
-
-2. **Data transformation**: Conversion of the data in preparation for indexing. For example, data is split into chunks.
-
-3. **Embedding**: Numerical representations of words or pieces of text. These numbers capture the semantic meaning and context of the text. Similar or related words or text tend to have similar embeddings, which means they are closer together in the high-dimensional vector space.
-
-4. **Data indexing**: Vertex AI RAG Engine creates an index called a corpus. The index structures the knowledge base so it's optimized for searching. For example, the index is like a detailed table of contents for a massive reference book.
-
-5. **Retrieval**: When a user asks a question or provides a prompt, the retrieval component in Vertex AI RAG Engine searches through its knowledge base to find information that is relevant to the query.
-
-6. **Generation**: The retrieved information becomes the context added to the original user query as a guide for the generative AI model to generate factually grounded and relevant responses.
-
-## Agent Development Kit (ADK)
-
-[Agent Development Kit (ADK)](https://google.github.io/adk-docs/) is a flexible and modular framework for developing and deploying AI agents. Key features include:
-
-- **Model-Agnostic**: While optimized for Gemini and the Google ecosystem, ADK works with any model.
-- **Flexible Orchestration**: Define workflows using workflow agents (`Sequential`, `Parallel`, `Loop`) or leverage LLM-driven dynamic routing for adaptive behavior.
-- **Multi-Agent Architecture**: Build modular applications by composing multiple specialized agents in a hierarchy.
-- **Rich Tool Ecosystem**: Equip agents with diverse capabilities through pre-built tools, custom functions, third-party integrations, or even other agents as tools.
-- **Deployment Ready**: Deploy agents anywhere – locally, on Vertex AI Agent Engine, or using Cloud Run/Docker.
-- **Built-in Evaluation**: Assess agent performance by evaluating both response quality and execution trajectory.
-
-ADK makes agent development feel more like software development, making it easier to create, deploy, and orchestrate agents ranging from simple tasks to complex workflows.
-
-## Table of Contents
-
-- [Vertex AI RAG Engine](#vertex-ai-rag-engine)
-  - [RAG Process Concepts](#rag-process-concepts)
-- [Agent Development Kit (ADK)](#agent-development-kit-adk)
-- [Features](#features)
-- [Pre-created RAG Corpora](#pre-created-rag-corpora)
-- [Architecture](#architecture)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Usage](#usage)
-  - [Running the Agent](#running-the-agent)
-  - [Example Commands](#example-commands)
-- [Configuration](#configuration)
-- [Supported File Types](#supported-file-types)
-- [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
-- [License](#license)
-- [References](#references)
-- [Example Workflow](#example-workflow)
-  - [Create GCS Buckets](#1-create-gcs-buckets)
-  - [Upload PDF Files to GCS Buckets](#2-upload-pdf-files-to-gcs-buckets)
-  - [Create RAG Corpora and Import Files](#3-create-rag-corpora-and-import-files) 
-  - [Query Across All Corpora](#4-query-across-all-corpora)
-- [Author](#author)
-
-## Features
-
-- 🗂️ **GCS Bucket Management**: Create, list, and manage GCS buckets for file storage.
-- 📚 **RAG Corpus Management**: Create, update, list, and delete RAG corpora in Vertex AI.
-- 📄 **Document Management**: Import documents from GCS into RAG corpora for vector search.
-- 🔎 **Semantic Search**: Query RAG corpora for relevant information with citations.
-- 🤖 **Agent-based Interface**: Interact with all functionalities through a natural language interface.
-- ⚙️ **Configurable & Extensible**: Centralized configuration, emoji-enhanced responses, and schema-compliant tools.
-
-## Pre-created RAG Corpora
-
-The project includes several pre-created RAG corpora covering major AI topics:
-
-- **Foundation Models & Prompt Engineering**: Resources on large language models and effective prompt design
-- **Embeddings & Vector Stores**: Details on text embeddings and vector databases
-- **Generative AI Agents**: Information on agent design, implementation, and usage
-- **Domain-Specific LLMs**: Techniques for applying LLMs to solve domain-specific problems
-- **MLOps for Generative AI**: Deployment and production considerations for GenAI systems
-
-Each corpus contains relevant PDF documents imported from Google and Kaggle's Gen AI Intensive course:
-
-- [Day 1: Foundational Models & Prompt Engineering](https://lnkd.in/d-_w3gXj)
-- [Day 2: Embeddings & Vector Stores / Databases](https://lnkd.in/dkmfDUcp)
-- [Day 3: Generative AI Agents](https://lnkd.in/dd3Zd2-F)
-- [Day 4: Domain-Specific LLMs](https://lnkd.in/d6Z39yqt)
-- [Day 5: MLOps for Generative AI](https://lnkd.in/dcXCTPVF)
-
-These documents are from Google and Kaggle's Gen AI Intensive course, which broke the GUINNESS WORLD RECORDS™ title for the Largest Attendance at a Virtual AI Conference in One Week with more than 280,000 signups in just 20 days. The materials provide a comprehensive overview of Vertex AI capabilities and best practices for working with generative AI.
+The design follows a component-and-data-flow model:
+1. User interacts with the chatbot UI.
+2. The agent classifies the request.
+3. The system decides whether to retrieve context or answer directly.
+4. If retrieval is needed, the RAG pipeline fetches relevant context from connected sources.
+5. The model generates a grounded response.
+6. The answer is returned to the UI.
 
 ## Architecture
 
-The project follows a modular architecture based on the ADK framework:
+The workflow is organized into the following layers:
 
-![ADK Vertex AI RAG Architecture](.Images/ADK-VertexAI-RAG-Architecture.png)
+### 1. User Interface
+The front end is a conversational chat interface that supports:
+- user messages,
+- assistant responses,
+- quick actions,
+- file/context display.
 
-The architecture consists of several key components:
+### 2. Agent Orchestration
+ADK manages the interaction flow:
+- intent understanding,
+- retrieval decision,
+- orchestration of tools,
+- response generation,
+- return of the final answer.
 
-1. **User Interface**: Interact with the system through ADK Web or CLI
-2. **Agent Development Kit (ADK)**: The core orchestration layer that manages tools and user interactions
-3. **Function Tools**: Modular components divided into:
-   - **Storage Tools**: For GCS bucket and file management
-   - **RAG Corpus Tools**: For corpus management and semantic search
-4. **Google Cloud Services**:
-   - **Google Cloud Storage**: Stores document files
-   - **Vertex AI RAG Engine**: Provides embedding, indexing and retrieval capabilities
-   - **Gemini 2.0 LLM Model**: Generates responses grounded in retrieved contexts
+### 3. Retrieval Pipeline
+When retrieval is needed, the pipeline performs:
+- query transformation,
+- retrieval from connected knowledge sources,
+- filtering and ranking,
+- chunking and context assembly,
+- grounding of the response.
 
-File structure:
+### 4. Knowledge Sources
+The knowledge base is centered on:
+- Google Drive documents,
+- connected repository data,
+- existing RAG corpus content.
+
+### 5. Authentication
+Authentication uses:
+- Application Default Credentials (ADC) only,
+- no API key,
+- Google Cloud permissions already approved for the project.
+
+## Business Goal
+
+The customized solution is intended to:
+- answer user questions conversationally,
+- retrieve grounded answers from Drive-backed content,
+- provide a tester-friendly hosted Google URL,
+- keep the custom UI separate from the hosted test experience,
+- preserve the client’s workflow and permissions constraints.
+
+## Current Project Configuration
+
+- **Google Cloud Project ID:** `corpbs-cdl-ai`
+- **Google Cloud Location:** `us-central1`
+- **RAG Corpus ID:** `projects/corpbs-cdl-ai/locations/us-central1/ragCorpora/bizguidegemini2-0-cdl-datastore-extensive_1748609021959`
+- **Knowledge base:** Google Drive
+- **Authentication:** ADC only
+- **Model:** `gemini-3.1-flash-preview-001`
+- **Embedding model:** `text-embedding-004`
+- **Agent name:** `bizguide_rag_corpus_manager`
+
+## Technical Workflow
+
+The implementation follows this sequence:
+
+1. **User asks a question** in the chat UI.
+2. **Agent understands the request** and classifies it.
+3. **Retrieval decision is made**:
+   - if the request needs context, the retrieval flow runs,
+   - if not, the agent can answer directly.
+4. **RAG retrieval runs** against the connected Drive-backed corpus.
+5. **Relevant chunks are assembled** into context.
+6. **Gemini generates the response** using the retrieved context.
+7. **Final answer is shown** in the UI.
+
+## Repository Structure
+
+```text
+VertexAIRAGCDLADC/
+  .venv/
+  .env
+  requirements.txt
+  config.py
+  ingest_rag.py
+  ui/
+    index.html
+    styles.css
+    app.js
 ```
-adk-vertex-ai-rag-engine/
-├── rag/                          # Main project package
-│   ├── __init__.py               # Package initialization
-│   ├── agent.py                  # The main RAG corpus manager agent
-│   ├── config/                   # Configuration directory
-│   │   └── __init__.py           # Centralized configuration settings
-│   └── tools/                    # ADK function tools
-│       ├── __init__.py           # Tools package initialization
-│       ├── corpus_tools.py       # RAG corpus management tools
-│       └── storage_tools.py      # GCS bucket management tools
-├── .Images/                      # Demo images and GIFs
-└── README.md                     # Project documentation
-```
 
-## Prerequisites
+## Local Development Setup
 
-- Python 3.11+
-- Google Cloud project with Vertex AI API enabled
-- [Google Cloud SDK](https://cloud.google.com/sdk/docs/install)
-- Access to Vertex AI and Cloud Storage
-
-## Installation
+### 1. Create the virtual environment
 
 ```bash
-# Clone the repository
-git clone https://github.com/arjunprabhulal/adk-vertex-ai-rag-engine.git
-cd adk-vertex-ai-rag-engine
+cd /Users/ravikarra/Documents/VertexAIRAGCDLADC
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install --upgrade pip
+python3 -m pip install google-adk google-cloud-aiplatform python-dotenv fastapi uvicorn[standard]
+```
 
-# (Optional) Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+### 2. Configure ADC
 
-# Install dependencies
-pip install -r requirements.txt
-
-# Configure your Google Cloud project
-export GOOGLE_CLOUD_PROJECT="your-project-id"
-export GOOGLE_CLOUD_LOCATION="us-central1"
-
-# Enable required Google Cloud services
-gcloud services enable aiplatform.googleapis.com --project=${GOOGLE_CLOUD_PROJECT}
-gcloud services enable storage.googleapis.com --project=${GOOGLE_CLOUD_PROJECT}
-
-# Set up IAM permissions
-gcloud projects add-iam-policy-binding ${GOOGLE_CLOUD_PROJECT} \
-    --member="user:YOUR_EMAIL@domain.com" \
-    --role="roles/aiplatform.user"
-gcloud projects add-iam-policy-binding ${GOOGLE_CLOUD_PROJECT} \
-    --member="user:YOUR_EMAIL@domain.com" \
-    --role="roles/storage.objectAdmin"
-
-# Set up Gemini API key
-# Get your API key from Google AI Studio: https://ai.google.dev/
-export GOOGLE_API_KEY=your_gemini_api_key_here
-
-# Set up authentication credentials
-# Option 1: Use gcloud application-default credentials (recommended for development)
+```bash
 gcloud auth application-default login
-
-# Option 2: Use a service account key (for production or CI/CD environments)
-# Download your service account key from GCP Console and set the environment variable
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
+gcloud config set project corpbs-cdl-ai
 ```
 
-## Usage
-
-### Running the Agent
-
-There are two ways to run the agent:
+If Drive access is needed in local code:
 
 ```bash
-# Option 1: Use ADK web interface (recommended for interactive usage)
-adk web 
-
-# Option 2: Run the agent directly in the terminal
-adk run rag
+gcloud auth application-default login --scopes=https://www.googleapis.com/auth/cloud-platform,https://www.googleapis.com/auth/drive
 ```
 
-The web interface provides a chat-like experience for interacting with the agent, while the direct run option is suitable for scripting and automated workflows.
+### 3. Create the `.env` file
 
-### Example Commands
-
-```
-# List all GCS buckets
-[user]: List all GCS buckets
-
-# Create a bucket for Foundation LLMs
-[user]: Create a GCS bucket named "adk-embedding-vector-stores"
-
-# Upload a document
-[user]: Upload this PDF file to GCS bucket gs://adk-embedding-vector-stores/ and keep the same destination blob name
-
-# Create a RAG corpus
-[user]: Create a RAG corpus named "adk-embedding-vector-stores" with description "adk-embedding-vector-stores"
-
-# Import a document into RAG corpus
-[user]: Import the file gs://adk-embedding-vector-stores/emebddings-vector-stores.pdf into the RAG corpus
-
-# Query a specific RAG corpus about prompt engineering
-[user]: What is Chain of Thought (CoT)?
-
-# Query across all corpora about MLOps
-[user]: How do multiple teams collaborate to operationalize GenAI models?
+```env
+GOOGLE_CLOUD_PROJECT=corpbs-cdl-ai
+GOOGLE_CLOUD_LOCATION=us-central1
+RAG_CORPUS_ID=projects/corpbs-cdl-ai/locations/us-central1/ragCorpora/bizguidegemini2-0-cdl-datastore-extensive_1748609021959
+GOOGLE_GENAI_USE_VERTEXAI=True
+AGENT_MODEL=gemini-3.1-flash-preview-001
+AGENT_NAME=bizguide_rag_corpus_manager
+RAG_DEFAULT_EMBEDDING_MODEL=text-embedding-004
+RAG_DEFAULT_TOP_K=10
+RAG_DEFAULT_SEARCH_TOP_K=5
+RAG_DEFAULT_VECTOR_DISTANCE_THRESHOLD=0.5
+RAG_DEFAULT_PAGE_SIZE=50
+LOG_LEVEL=INFO
+LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
 ```
 
-## Configuration
+## Console Setup
 
-Edit `rag/config/__init__.py` to customize your settings:
+In Google Cloud Console:
+1. Open the project `corpbs-cdl-ai`.
+2. Open the Vertex AI Search / RAG app.
+3. Confirm the corpus is connected to Google Drive.
+4. Verify preview responses in the hosted Google experience.
+5. Use the integration widget only if a custom UI shell is needed.
+6. Share the hosted `vertexaisearch.cloud.google.com/...` URL with testers.
 
-- `PROJECT_ID`: Your Google Cloud project ID
-- `LOCATION`: Default location for Vertex AI and GCS resources
-- `GCS_DEFAULT_*`: Defaults for GCS operations
-- `RAG_DEFAULT_*`: Defaults for RAG operations
-- `AGENT_*`: Settings for the agent
+## Ingestion Script
 
-## Supported File Types
+Use the ingestion script to import Drive files into the corpus.
 
-The engine supports various document types, including:
-- PDF
-- TXT
-- DOC/DOCX
-- XLS/XLSX
-- PPT/PPTX
-- CSV
-- JSON
-- HTML
-- Markdown
+```python
+import asyncio
+import logging
+import os
+import vertexai
+from vertexai import rag
+from dotenv import load_dotenv
 
-## Troubleshooting
+load_dotenv()
 
-### Common Issues
+PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT")
+LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION")
+CORPUS_ID = os.getenv("RAG_CORPUS_ID")
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+LOG_FORMAT = os.getenv("LOG_FORMAT")
 
-- **403 Errors**: Make sure you've authenticated with `gcloud auth application-default login`
-- **Resource Exhausted**: Check your quota limits in the GCP Console
-- **Upload Issues**: Ensure your file format is supported and file size is within limits
+logging.basicConfig(level=getattr(logging, LOG_LEVEL), format=LOG_FORMAT)
 
-## Contributing
+async def ingest_drive_files():
+    vertexai.init(project=PROJECT_ID, location=LOCATION)
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+    drive_paths = [
+        "https://drive.google.com/file/d/YOUR_FILE_ID_1",
+        "https://drive.google.com/file/d/YOUR_FILE_ID_2",
+    ]
+
+    response = await rag.import_files(
+        corpus_name=CORPUS_ID,
+        paths=drive_paths,
+        max_embedding_requests_per_min=900,
+    )
+    result = await response.result()
+    print(f"Imported {result.imported_rag_files_count} files.")
+
+if __name__ == "__main__":
+    asyncio.run(ingest_drive_files())
+```
+
+Run it with:
+
+```bash
+source .venv/bin/activate
+python3 ingest_rag.py
+```
+
+## Custom UI
+
+The `ui/index.html` file is used only for the custom front-end shell. It can mirror the reference diagram’s conversational flow and should support:
+- user input,
+- assistant messages,
+- retrieval status,
+- document/context cards,
+- quick actions.
+
+This UI is separate from the hosted Google tester URL.
+
+## Tester Experience
+
+End users should test the solution using the hosted Google URL, not a local file path. The hosted URL provides the production-like experience for validation while the custom UI remains available for branding or embedding.
+
+## Implementation Notes
+
+- No API key is used.
+- ADC is the only authentication method.
+- Google Drive is the knowledge base.
+- The workflow is conversational and RAG-based.
+- The architecture should align with the provided component/data-flow diagram [file:181].
 
 ## License
 
-[MIT License](LICENSE)
-
-## References
-
-- [Google Agent Development Kit (ADK)](https://google.github.io/adk-docs/)
-- [Vertex AI RAG Engine](https://cloud.google.com/vertex-ai/generative-ai/docs/rag-engine/rag-overview)
-- [Google Cloud Storage](https://cloud.google.com/storage)
-
-## Example Workflow
-
-Below is a complete example workflow showing how to set up the entire RAG environment with the Google Gen AI Intensive course materials:
-
-### 1. Create GCS Buckets
-
-![GCS Bucket Creation CLI](.Images/GCS-Bucket-creation-cli.gif)
-
-```
-Create the following 7 Google Cloud Storage buckets for my project, using the default settings (location: US, storage class: STANDARD) for all of them. Do not ask for confirmation for each bucket.
-
-1. adk-foundation-llm
-2. adk-prompt-engineering
-3. adk-embedding-vector-stores
-4. adk-agents-llm
-5. adk-agents-companion
-6. adk-solving-domain-problem-using-llms
-7. adk-operationalizing-genai-vertex-ai
-```
-
-### 2. Upload PDF Files to GCS Buckets
-
-![GCS File Upload Web](.Images/GCS-File-Upload-Web.gif)
-
-![GCS Multiple Uploads](.Images/GCS-Multiple-Uploads.png)
-
-```
-Upload the file "promptengineering.pdf" to the GCS bucket gs://adk-prompt-engineering/ and use "promptengineering.pdf" as the destination blob name. Do not ask for confirmation.
-
-Upload the file "foundational-large-language-models-text-generation.pdf" to the GCS bucket gs://adk-foundation-llm/ and use "foundational-large-language-models-text-generation.pdf" as the destination blob name. Do not ask for confirmation.
-
-Upload the file "agents.pdf" to the GCS bucket gs://adk-agents-llm/ and use "agents.pdf" as the destination blob name. Do not ask for confirmation.
-
-Upload the file "agents-companion.pdf" to the GCS bucket gs://adk-agents-companion/ and use "agents-companion.pdf" as the destination blob name. Do not ask for confirmation.
-
-Upload the file "emebddings-vector-stores.pdf" to the GCS bucket gs://adk-embedding-vector-stores/ and use "emebddings-vector-stores.pdf" as the destination blob name. Do not ask for confirmation.
-
-Upload the file "operationalizing-generative-ai-on-vertex-ai.pdf" to the GCS bucket gs://adk-operationalizing-genai-vertex-ai/ and use "operationalizing-generative-ai-on-vertex-ai.pdf" as the destination blob name. Do not ask for confirmation.
-
-Upload the file "solving-domain-specific-problems-using-llms.pdf" to the GCS bucket gs://adk-solving-domain-problem-using-llms/ and use "solving-domain-specific-problems-using-llms.pdf" as the destination blob name. Do not ask for confirmation.
-```
-
-### 3. Create RAG Corpora and Import Files
-
-![RAG Create Import Web](.Images/RAG-Create-Import-Web.gif)
-
-![RAG Create Multiple Upload CLI](.Images/RAG-Create-Mutliple-Upload-CLI.gif)
-
-```
-Create a RAG corpus named "adk-agents-companion" with description of rag as "adk-agents-companion" and import the gs://adk-agents-companion/agents-companion.pdf into RAG
-
-Create a RAG corpus named "adk-agents-llm" with description "adk-agents-llm" and import the file gs://adk-agents-llm/agents.pdf into the RAG corpus.
-
-Create a RAG corpus named "adk-embedding-vector-stores" with description "adk-embedding-vector-stores" and import the file gs://adk-embedding-vector-stores/emebddings-vector-stores.pdf into the RAG corpus.
-
-Create a RAG corpus named "adk-foundation-llm" with description "adk-foundation-llm" and import the file gs://adk-foundation-llm/foundational-large-language-models-text-generation.pdf into the RAG corpus.
-
-Create a RAG corpus named "adk-operationalizing-genai-vertex-ai" with description "adk-operationalizing-genai-vertex-ai" and import the file gs://adk-operationalizing-genai-vertex-ai/operationalizing-generative-ai-on-vertex-ai.pdf into the RAG corpus.
-
-Create a RAG corpus named "adk-solving-domain-problem-using-llms" with description "adk-solving-domain-problem-using-llms" and import the file gs://adk-solving-domain-problem-using-llms/solving-domain-specific-problems-using-llms.pdf into the RAG corpus.
-```
-
-### 4. Query Across All Corpora
-
-![RAG Multiple Query Search CLI](.Images/RAG-Multiple-Query-Search-CLI.gif)
-
-![RAG Multiple Search Corpus Web](.Images/RAG-Multiple-Search-Corpus-Web.gif)
-
-![RAG Single Query Search Web](.Images/RAG-Single-Query-Search-Web.gif)
-
-```
-# Questions about Prompt Engineering
-What is Chain of Thought (CoT)?
-What is Tree of Thoughts (ToT)?
-What is ReAct (reason & act)?
-
-# Questions about Embeddings & Vector Stores
-What are Types of embeddings?
-What is Vector search?
-What is Vector databases?
-
-# Questions about Agents
-What is Agent Lifecycle?
-
-# Questions about MLOps & Operationalization
-How do multiple teams collaborate to operationalize GenAI models?
-How multiple teams collaborate to operationalize both models and GenAI applications?
-```
-
-## Author
-
-For more articles on AI/ML and Generative AI, follow me on Medium: https://medium.com/@arjun-prabhulal
+This project is customized for a client implementation and should preserve attribution and licensing requirements from any upstream source code that was reused.
